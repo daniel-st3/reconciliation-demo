@@ -152,7 +152,8 @@ Candidate selection uses a weighted score (`0.6 × name_sim + 0.4 × amount_clos
 
 Here's the complete workflow running on n8n Cloud:
 
-![n8n Workflow Canvas](./Screenshot%202026-02-17%20at%202.59.37%20PM.png)
+![n8n Workflow Canvas](./n8n_squema.png)
+
 
 **Node breakdown:**
 1. **Webhook** — Accepts GET request with `bank_url` and `erp_url` query params
