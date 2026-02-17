@@ -1,0 +1,101 @@
+date,amount,beneficiary,reference,status
+2024-08-04,22095.19,Global Supplies Co,TXN-00025,completed
+2024-09-29,8039.61,Delta Trading Co,TXN-00038,pending
+2024-01-31,18297.76,Nexus Solutions,TXN-00060,completed
+2024-04-14,18139.78,Nexus Solutions,TXN-00084,completed
+2024-10-02,18169.2,Nexus Solutions,TXN-00021,completed
+2024-01-01,3537.84,Theta Consulting,TXN-00034,completed
+2024-05-31,7726.58,Delta Trading Co,TXN-00064,completed
+2024-01-04,18001.01,Nexus Solutions,TXN-00045,completed
+2024-06-03,16156.36,Iota Logistics,TXN-00079,completed
+2024-04-29,57250.22,Alpha Industries,TXN-00010,pending
+2024-05-07,3525.26,Theta Consulting,TXN-00054,completed
+2024-11-23,66149.35,Omega Services,TXN-00015,completed
+2024-02-20,16458.75,Iota Logistics,TXN-00057,completed
+2024-01-29,18104.33,Nexus Solutions,TXN-00016,completed
+2024-01-01,3537.84,Theta Consulting,TXN-00034,completed
+2024-04-30,3373.38,TechSoft Ltd,TXN-00069,completed
+2024-08-17,32354.26,Sigma Analytics,TXN-00001,completed
+2024-07-24,49385.51,Acme Corp,TXN-00017,completed
+2024-10-08,21922.79,Global Supplies Co,TXN-00039,completed
+2024-12-04,37645.57,Zeta Manufacturing,TXN-00009,completed
+2024-01-28,8062.24,Delta Trading Co,TXN-00052,completed
+2024-03-22,3526.84,Theta Consulting,TXN-00002,completed
+2024-05-13,32153.05,Sigma Analytics,TXN-00072,completed
+2024-04-29,57250.22,Alpha Industries,TXN-00010,completed
+2024-12-19,49382.67,Kappa Ventures,TXN-00041,completed
+2024-02-17,33166.73,Sigma Analytics,TXN-00058,failed
+2024-04-05,31692.18,Sigma Analytics,TXN-00068,completed
+2024-11-21,66181.65,Omega Services,TXN-00011,pending
+2024-01-11,17437.6,Nexus Solutions,TXN-00044,completed
+2024-02-26,3389.52,TechSoft Ltd,TXN-00024,completed
+2024-05-02,16411.18,Iota Logistics,TXN-00036,completed
+2024-10-01,3374.69,TechSoft Ltd,TXN-00028,pending
+2024-05-30,65380.08,Omega Services,TXN-00007,pending
+2024-04-20,50554.53,Beta Systems Inc,TXN-00003,failed
+2024-02-10,49465.62,Kappa Ventures,TXN-00037,completed
+2024-04-17,21545.51,Global Supplies Co,TXN-00012,completed
+2024-08-04,32411.01,Sigma Analytics,TXN-00055,completed
+2024-07-04,3775.44,Gamma Resources,TXN-00008,completed
+2024-02-20,16458.75,Iota Logistics,TXN-00057,completed
+2024-03-21,50309.15,Kappa Ventures,TXN-00067,completed
+2024-10-23,49472.47,Kappa Ventures,TXN-00070,completed
+2024-07-27,3444.79,Theta Consulting,TXN-00050,completed
+2024-03-23,21550.38,Global Supplies Co,TXN-00033,completed
+2024-12-09,55293.48,Alpha Industries,TXN-00042,completed
+2024-10-04,48728.27,Acme Corp,TXN-00065,completed
+2024-03-14,49688.78,Kappa Ventures,TXN-00020,completed
+2024-10-26,49876.03,Beta Systems Inc,TXN-00066,completed
+2024-10-17,18349.85,Nexus Solutions,TXN-00018,pending
+2024-10-25,3674.25,Gamma Resources,TXN-00022,completed
+2024-08-27,66598.78,Omega Services,TXN-00026,completed
+2024-10-11,39792.31,Zeta Manufacturing,TXN-00063,completed
+2024-05-15,38212.77,Zeta Manufacturing,TXN-00073,completed
+2024-03-22,3526.84,Theta Consulting,TXN-00002,completed
+2024-08-04,32411.01,Sigma Analytics,TXN-00055,completed
+2024-11-23,66149.35,Omega Services,TXN-00015,completed
+2024-06-30,3370.13,TechSoft Ltd,TXN-00051,completed
+2024-08-04,3441.08,Theta Consulting,TXN-00062,completed
+2024-12-05,32119.9,Sigma Analytics,TXN-00081,completed
+2024-08-22,17723.28,Epsilon Tech,TXN-00074,completed
+2024-05-14,21654.36,Global Supplies Co,TXN-00030,failed
+2024-07-27,15859.68,Iota Logistics,TXN-00059,completed
+2024-05-19,38767.02,Zeta Manufacturing,TXN-00083,completed
+2024-11-27,39656.04,Zeta Manufacturing,TXN-00013,completed
+2024-02-27,3479.57,Theta Consulting,TXN-00029,completed
+2024-05-15,49910.06,Acme Corp,TXN-00061,failed
+2024-10-23,49472.47,Kappa Ventures,TXN-00070,completed
+2024-10-22,50396.83,Kappa Ventures,TXN-00049,completed
+2024-09-07,15886.37,Iota Logistics,TXN-00085,completed
+2024-05-25,48510.62,Kappa Ventures,TXN-00078,completed
+2024-07-04,7662.52,Delta Trading Co,TXN-00035,pending
+2024-01-02,15898.65,Iota Logistics,TXN-00087,completed
+2024-02-07,3799.94,Gamma Resources,TXN-00076,completed
+2024-08-19,8079.18,Delta Trading Co,TXN-00043,completed
+2024-06-27,32053.23,Sigma Analytics,TXN-00077,pending
+2024-07-13,50014.51,Beta Systems Inc,TXN-00004,completed
+2024-02-29,48185.48,Kappa Ventures,TXN-00082,pending
+2024-03-11,18440.3,Nexus Solutions,TXN-00023,completed
+2024-10-02,18169.2,Nexus Solutions,TXN-00021,completed
+2024-02-24,3383.86,Theta Consulting,TXN-00031,pending
+2024-03-14,49688.78,Kappa Ventures,TXN-00020,completed
+2024-01-05,3482.27,Theta Consulting,TXN-00080,completed
+2024-07-25,17146.54,Epsilon Tech,TXN-00053,pending
+2024-05-13,32153.05,Sigma Analytics,TXN-00072,completed
+2024-02-29,48185.48,Kappa Ventures,TXN-00082,completed
+2024-05-05,17223.21,Epsilon Tech,TXN-00014,completed
+2024-02-17,50289.59,Kappa Ventures,TXN-00086,completed
+2024-09-16,56771.07,Alpha Industries,TXN-00032,completed
+2024-01-06,33215.01,Sigma Analytics,TXN-00027,completed
+2024-02-04,17104.86,Epsilon Tech,TXN-00046,pending
+2024-12-02,3597.55,Gamma Resources,TXN-00071,completed
+2024-09-20,15950.62,Iota Logistics,TXN-00047,completed
+2024-08-04,33237.75,Sigma Analytics,TXN-00040,failed
+2024-03-04,38549.53,Zeta Manufacturing,TXN-00006,failed
+2024-07-24,49385.51,Acme Corp,TXN-00017,completed
+2024-02-08,7771.56,Delta Trading Co,TXN-00056,completed
+2024-09-12,50353.95,Beta Systems Inc,TXN-00019,completed
+2024-12-02,3597.55,Gamma Resources,TXN-00071,completed
+2024-01-05,3540.6,Theta Consulting,TXN-00075,completed
+2024-10-03,17554.51,Epsilon Tech,TXN-00048,completed
+2024-05-15,15963.69,Iota Logistics,TXN-00005,pending
