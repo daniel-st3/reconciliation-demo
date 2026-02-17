@@ -1,0 +1,231 @@
+{
+  "name": "B2B Payments Reconciliation Bot",
+  "active": false,
+  "nodes": [
+
+    {
+      "id": "c1a2b3d4-0001-4e5f-a6b7-aaaaaaaaaaaa",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 300],
+      "webhookId": "b2b-reconcile-v2",
+      "parameters": {
+        "path": "reconcile",
+        "httpMethod": "GET",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "notes": "Trigger: GET /webhook/reconcile?bank_url=<url>&erp_url=<url>"
+    },
+
+    {
+      "id": "c1a2b3d4-0002-4e5f-a6b7-bbbbbbbbbbbb",
+      "name": "Fetch and Parse CSVs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 300],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// ── Read URLs from webhook query params ────────────────────────────────\nconst webhookData = $input.first().json;\nconst bankUrl = (webhookData.query && webhookData.query.bank_url) || '';\nconst erpUrl  = (webhookData.query && webhookData.query.erp_url)  || '';\n\nif (!bankUrl || !erpUrl) {\n  throw new Error('Missing query params: ?bank_url=<url>&erp_url=<url>');\n}\n\n// ── Simple CSV parser (no external libraries needed) ────────────────────\nconst NL = String.fromCharCode(10);\n\nfunction parseCSV(text) {\n  const lines = (text || '').trim().split(NL);\n  if (lines.length < 2) return [];\n  const headers = lines[0].split(',').map(h => h.trim().replace(/['\"]/g, ''));\n  return lines.slice(1).filter(l => l.trim()).map(line => {\n    const values = line.split(',').map(v => v.trim().replace(/['\"]/g, ''));\n    const row = {};\n    headers.forEach((h, i) => { row[h] = values[i] !== undefined ? values[i] : ''; });\n    return row;\n  });\n}\n\n// ── Name normaliser: strips legal suffixes, lowercases, collapses spaces\nconst STOP = ['corp','corporation','inc','incorporated','ltd','limited','llc',\n              'co','company','group','svcs','services','solutions','manufacturing',\n              'industries','resources','logistics','consulting','analytics',\n              'technology','systems','ventures','venture'];\n\nfunction normalizeName(name) {\n  return (name || '').toLowerCase()\n    .replace(/[^a-z0-9 ]/g, ' ')\n    .split(' ')\n    .filter(w => w.length > 0 && !STOP.includes(w))\n    .join(' ')\n    .trim();\n}\n\n// ── Fetch both CSVs via built-in helper ────────────────────────────────\nconst bankRaw = await $helpers.httpRequest({ method: 'GET', url: bankUrl });\nconst erpRaw  = await $helpers.httpRequest({ method: 'GET', url: erpUrl  });\n\nconst bankText = typeof bankRaw === 'string' ? bankRaw : JSON.stringify(bankRaw);\nconst erpText  = typeof erpRaw  === 'string' ? erpRaw  : JSON.stringify(erpRaw);\n\n// ── Parse and normalise bank_transactions ──────────────────────────────\nconst bankTransactions = parseCSV(bankText).map((row, idx) => ({\n  _idx:                   idx,\n  date:                   (row.date        || '').trim(),\n  amount:                 parseFloat(row.amount) || 0,\n  beneficiary:            (row.beneficiary || '').trim(),\n  beneficiary_normalized: normalizeName(row.beneficiary),\n  reference:              (row.reference   || '').trim(),\n  status:                 (row.status      || '').trim(),\n}));\n\n// ── Parse and normalise erp_payables ───────────────────────────────────\nconst erpPayables = parseCSV(erpText).map((row, idx) => ({\n  _idx:                idx,\n  invoice_id:          (row.invoice_id || '').trim(),\n  supplier:            (row.supplier   || '').trim(),\n  supplier_normalized: normalizeName(row.supplier),\n  amount:              parseFloat(row.amount) || 0,\n  due_date:            (row.due_date   || '').trim(),\n  status:              (row.status     || '').trim(),\n}));\n\nreturn [{\n  json: {\n    bank_transactions: bankTransactions,\n    erp_payables:      erpPayables,\n    bank_count:        bankTransactions.length,\n    erp_count:         erpPayables.length,\n    fetched_at:        new Date().toISOString(),\n  }\n}];"
+      }
+    },
+
+    {
+      "id": "c1a2b3d4-0003-4e5f-a6b7-cccccccccccc",
+      "name": "Fuzzy Match",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [760, 300],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// ── Thresholds ──────────────────────────────────────────────────────────\nconst SIM_THRESHOLD = 0.72;  // minimum Jaro-Winkler name similarity\nconst AMT_TOLERANCE = 0.05;  // 5% amount difference boundary\n\n// ── Jaro similarity (core metric) ──────────────────────────────────────\nfunction jaroSim(s1, s2) {\n  if (s1 === s2) return 1.0;\n  if (!s1 || !s2) return 0.0;\n  const maxDist = Math.floor(Math.max(s1.length, s2.length) / 2) - 1;\n  if (maxDist < 0) return 0.0;\n  const s1m = new Array(s1.length).fill(false);\n  const s2m = new Array(s2.length).fill(false);\n  let matches = 0;\n  for (let i = 0; i < s1.length; i++) {\n    const lo = Math.max(0, i - maxDist);\n    const hi = Math.min(i + maxDist + 1, s2.length);\n    for (let j = lo; j < hi; j++) {\n      if (s2m[j] || s1[i] !== s2[j]) continue;\n      s1m[i] = true; s2m[j] = true; matches++; break;\n    }\n  }\n  if (matches === 0) return 0.0;\n  let t = 0, k = 0;\n  for (let i = 0; i < s1.length; i++) {\n    if (!s1m[i]) continue;\n    while (!s2m[k]) k++;\n    if (s1[i] !== s2[k]) t++;\n    k++;\n  }\n  return (matches / s1.length + matches / s2.length + (matches - t / 2) / matches) / 3;\n}\n\n// ── Jaro-Winkler: adds prefix bonus (p=0.1, max prefix length=4) ───────\nfunction jaroWinkler(s1, s2) {\n  const j = jaroSim(s1, s2);\n  let p = 0;\n  const n = Math.min(s1.length, s2.length, 4);\n  for (let i = 0; i < n; i++) { if (s1[i] === s2[i]) p++; else break; }\n  return j + p * 0.1 * (1 - j);\n}\n\n// ── Main matching loop ──────────────────────────────────────────────────\nconst data = $input.first().json;\nconst bank = data.bank_transactions || [];\nconst erp  = data.erp_payables     || [];\nconst results = [];\nconst erpUsed = new Set();\n\nfor (const tx of bank) {\n  let best = null, bestScore = 0;\n\n  for (const inv of erp) {\n    if (erpUsed.has(inv._idx)) continue;\n    const sim = jaroWinkler(tx.beneficiary_normalized, inv.supplier_normalized);\n    if (sim < SIM_THRESHOLD) continue;\n    const amtDiff = Math.abs(tx.amount - inv.amount) / Math.max(tx.amount, inv.amount, 0.01);\n    // Weighted score: 60% name + 40% amount closeness\n    const score = sim * 0.6 + (1 - Math.min(amtDiff, 1)) * 0.4;\n    if (score > bestScore) { bestScore = score; best = { inv, sim, amtDiff }; }\n  }\n\n  if (best) {\n    const { sim, amtDiff, inv } = best;\n    erpUsed.add(inv._idx);\n    let matchStatus, issue = null;\n\n    if (amtDiff <= 0.01 && sim >= 0.90) {\n      matchStatus = 'matched';\n    } else if (amtDiff <= AMT_TOLERANCE) {\n      matchStatus = 'pending';\n      issue = amtDiff > 0.01\n        ? 'Amount variance ' + (amtDiff * 100).toFixed(2) + '% — within 5% tolerance, needs review'\n        : 'Name similarity ' + (sim * 100).toFixed(0) + '% — verify company identity';\n    } else {\n      matchStatus = 'discrepant';\n      issue = 'Amount variance ' + (amtDiff * 100).toFixed(2) + '% exceeds 5% threshold';\n    }\n\n    results.push({\n      bank_reference:   tx.reference,\n      bank_beneficiary: tx.beneficiary,\n      bank_amount:      tx.amount,\n      bank_date:        tx.date,\n      bank_status:      tx.status,\n      invoice_id:       inv.invoice_id,\n      erp_supplier:     inv.supplier,\n      erp_amount:       inv.amount,\n      erp_due_date:     inv.due_date,\n      erp_status:       inv.status,\n      match_status:     matchStatus,\n      name_similarity:  parseFloat(sim.toFixed(4)),\n      amount_diff_pct:  parseFloat((amtDiff * 100).toFixed(2)),\n      amount_variance:  parseFloat((tx.amount - inv.amount).toFixed(2)),\n      issue,\n      match_score:      parseFloat(bestScore.toFixed(4)),\n    });\n  } else {\n    results.push({\n      bank_reference:   tx.reference,\n      bank_beneficiary: tx.beneficiary,\n      bank_amount:      tx.amount,\n      bank_date:        tx.date,\n      bank_status:      tx.status,\n      invoice_id:       null,\n      erp_supplier:     null,\n      erp_amount:       null,\n      match_status:     'unmatched_bank',\n      issue:            'No ERP payable found for this bank transaction',\n    });\n  }\n}\n\n// ── Unmatched ERP entries (no bank counterpart) ─────────────────────────\nfor (const inv of erp) {\n  if (!erpUsed.has(inv._idx)) {\n    results.push({\n      bank_reference:   null,\n      bank_beneficiary: null,\n      bank_amount:      null,\n      invoice_id:       inv.invoice_id,\n      erp_supplier:     inv.supplier,\n      erp_amount:       inv.amount,\n      erp_due_date:     inv.due_date,\n      erp_status:       inv.status,\n      match_status:     'unmatched_erp',\n      issue:            'No bank transaction found for this ERP payable',\n    });\n  }\n}\n\n// ── Aggregate stats ──────────────────────────────────────────────────────\nconst counts = results.reduce((a, r) => {\n  a[r.match_status] = (a[r.match_status] || 0) + 1;\n  return a;\n}, {});\n\nconst amtAtRisk = results\n  .filter(r => ['pending','discrepant','unmatched_bank','unmatched_erp'].includes(r.match_status))\n  .reduce((s, r) => s + Math.abs(r.amount_variance || r.bank_amount || r.erp_amount || 0), 0);\n\nreturn [{\n  json: {\n    results,\n    stats: {\n      total_bank:        bank.length,\n      total_erp:         erp.length,\n      matched:           counts.matched        || 0,\n      pending:           counts.pending        || 0,\n      discrepant:        counts.discrepant     || 0,\n      unmatched_bank:    counts.unmatched_bank || 0,\n      unmatched_erp:     counts.unmatched_erp  || 0,\n      total_at_risk_usd: parseFloat(amtAtRisk.toFixed(2)),\n    },\n  },\n}];"
+      }
+    },
+
+    {
+      "id": "c1a2b3d4-0004-4e5f-a6b7-dddddddddddd",
+      "name": "Rules-Based Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1040, 300],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// ── Build structured summary from fuzzy match output ────────────────────\nconst data    = $input.first().json;\nconst results = data.results || [];\nconst stats   = data.stats   || {};\n\n// Top 5 discrepant / pending pairs as examples\nconst exampleDiscrepancies = results\n  .filter(r => ['discrepant', 'pending'].includes(r.match_status))\n  .slice(0, 5)\n  .map(r => ({\n    bank_reference:   r.bank_reference,\n    bank_beneficiary: r.bank_beneficiary,\n    bank_amount:      r.bank_amount,\n    erp_supplier:     r.erp_supplier,\n    erp_amount:       r.erp_amount,\n    match_status:     r.match_status,\n    amount_diff_pct:  r.amount_diff_pct,\n    name_similarity:  r.name_similarity,\n    issue:            r.issue,\n  }));\n\nconst summary = {\n  run_id:               'REC-' + Date.now(),\n  timestamp:            new Date().toISOString(),\n  matched_count:        stats.matched         || 0,\n  pending_count:        stats.pending         || 0,\n  discrepant_count:     stats.discrepant      || 0,\n  unmatched_bank_count: stats.unmatched_bank  || 0,\n  unmatched_erp_count:  stats.unmatched_erp   || 0,\n  total_at_risk_usd:    stats.total_at_risk_usd || 0,\n  example_discrepancies: exampleDiscrepancies,\n};\n\n// Human-readable one-liner for Slack / email subject lines\nconst message =\n  'Reconciliation complete — ' +\n  'Matched: '         + summary.matched_count        + ' | ' +\n  'Pending: '         + summary.pending_count         + ' | ' +\n  'Discrepant: '      + summary.discrepant_count      + ' | ' +\n  'Unmatched Bank: '  + summary.unmatched_bank_count  + ' | ' +\n  'Unmatched ERP: '   + summary.unmatched_erp_count   + '. ' +\n  'Amount at risk: $' + summary.total_at_risk_usd.toLocaleString() + '.';\n\nreturn [{\n  json: {\n    summary,\n    message,\n    all_results: results,\n    // Flat object for Google Sheets row\n    sheet_row: {\n      run_id:               summary.run_id,\n      timestamp:            summary.timestamp,\n      matched_count:        summary.matched_count,\n      pending_count:        summary.pending_count,\n      discrepant_count:     summary.discrepant_count,\n      unmatched_bank_count: summary.unmatched_bank_count,\n      unmatched_erp_count:  summary.unmatched_erp_count,\n      total_at_risk_usd:    summary.total_at_risk_usd,\n    },\n  }\n}];"
+      }
+    },
+
+    {
+      "id": "c1a2b3d4-0005-4e5f-a6b7-eeeeeeeeeeee",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1320, 300],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({summary: $json.summary, message: $json.message, top_discrepancies: $json.summary.example_discrepancies}) }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              { "name": "Content-Type", "value": "application/json" }
+            ]
+          }
+        }
+      }
+    },
+
+    {
+      "id": "c1a2b3d4-0006-4e5f-a6b7-ffffffffffff",
+      "name": "Log to Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [1320, 100],
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID_HERE",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "ReconciliationLog",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "run_id":               "={{ $json.sheet_row.run_id }}",
+            "timestamp":            "={{ $json.sheet_row.timestamp }}",
+            "matched_count":        "={{ $json.sheet_row.matched_count }}",
+            "pending_count":        "={{ $json.sheet_row.pending_count }}",
+            "discrepant_count":     "={{ $json.sheet_row.discrepant_count }}",
+            "unmatched_bank_count": "={{ $json.sheet_row.unmatched_bank_count }}",
+            "unmatched_erp_count":  "={{ $json.sheet_row.unmatched_erp_count }}",
+            "total_at_risk_usd":    "={{ $json.sheet_row.total_at_risk_usd }}"
+          },
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
+      },
+      "notes": "Add your Google Sheets credential and set the Sheet ID before enabling.",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_GOOGLE_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+
+    {
+      "id": "c1a2b3d4-0007-4e5f-a6b7-111111111111",
+      "name": "(Optional) LLM Classification",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1320, 500],
+      "disabled": true,
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-api-key",        "value": "={{ $env.ANTHROPIC_API_KEY }}" },
+            { "name": "anthropic-version", "value": "2023-06-01" },
+            { "name": "content-type",      "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"model\": \"claude-opus-4-6\",\n  \"max_tokens\": 2048,\n  \"system\": \"You are a B2B payments reconciliation analyst. Review the match results and return a JSON object with keys: classifications (array of {bank_reference, invoice_id, status, risk_score 1-10, reason, action_required}), summary (matched_count, pending_count, discrepant_count, top_issues array, recommended_actions string). Return valid JSON only.\",\n  \"messages\": [{\"role\": \"user\", \"content\": \"={{ JSON.stringify({stats: $json.summary, discrepancies: $json.example_discrepancies}) }}\"}]\n}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "notes": "OPTIONAL — enable + set ANTHROPIC_API_KEY env var to activate AI classification."
+    },
+
+    {
+      "id": "c1a2b3d4-0008-4e5f-a6b7-222222222222",
+      "name": "(Optional) Slack Alert",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [1600, 500],
+      "disabled": true,
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "channel": {
+          "__rl": true,
+          "value": "reconciliation-alerts",
+          "mode": "name"
+        },
+        "text": "={{ $json.message }}",
+        "otherOptions": {
+          "mrkdwn": true
+        }
+      },
+      "notes": "OPTIONAL — enable + add Slack credential + set channel name to activate.",
+      "credentials": {
+        "slackApi": {
+          "id": "YOUR_SLACK_CREDENTIAL_ID",
+          "name": "Slack account"
+        }
+      }
+    }
+
+  ],
+
+  "connections": {
+    "Webhook": {
+      "main": [
+        [{ "node": "Fetch and Parse CSVs", "type": "main", "index": 0 }]
+      ]
+    },
+    "Fetch and Parse CSVs": {
+      "main": [
+        [{ "node": "Fuzzy Match", "type": "main", "index": 0 }]
+      ]
+    },
+    "Fuzzy Match": {
+      "main": [
+        [{ "node": "Rules-Based Summary", "type": "main", "index": 0 }]
+      ]
+    },
+    "Rules-Based Summary": {
+      "main": [
+        [
+          { "node": "Respond to Webhook",          "type": "main", "index": 0 },
+          { "node": "Log to Google Sheets",         "type": "main", "index": 0 },
+          { "node": "(Optional) LLM Classification","type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "(Optional) LLM Classification": {
+      "main": [
+        [{ "node": "(Optional) Slack Alert", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+
+  "staticData": null,
+  "pinData": {},
+  "tags": [
+    { "name": "finance" },
+    { "name": "reconciliation" },
+    { "name": "b2b" },
+    { "name": "portfolio" }
+  ],
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "instanceId": "local"
+  }
+}
